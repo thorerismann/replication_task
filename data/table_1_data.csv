@@ -1,0 +1,27 @@
+Variable,Obs,Mean,Std. dev.,Min,Max
+EE installed (any),2084,0.6862,0.4642,0,1
+Low-cost EE installed,2084,0.5298,0.4992,0,1
+High-cost EE installed,2084,0.5926,0.4915,0,1
+Age dwelling,1944,2.4835,1.1691,1,5
+Surface,2084,4.3772,1.8715,1,6
+Bedrooms,2065,3.7806,1.0124,1,7
+Size,2059,2.2661,1.1568,1,8
+Tenure,2084,1.3244,0.5170,1,3
+Type housing,1905,2.8462,1.6026,1,6
+EPC,2084,7.2668,2.4885,1,9
+Move date,2032,5.8784,1.4633,1,7
+People >75,2074,0.1090,0.3117,0,1
+People <16,2074,0.3187,0.4661,0,1
+Region,2084,6.2030,2.9922,1,11
+Income,1606,7.2067,3.7404,1,15
+Awareness,2084,0.9822,1.2345,0,6
+Tax credits pref.,2084,6.6871,2.6238,1,11
+Loan pref.,2084,5.3796,2.7973,1,11
+Grant pref.,2084,8.2505,2.6314,1,11
+Admin barrier pref.,2084,7.3464,2.4965,1,11
+Utilities pref.,2084,7.6142,2.7599,1,11
+Info. Efficient use pref.,2084,6.3608,2.5440,1,11
+Info. Potential savings pref.,2084,6.6080,2.5833,1,11
+Info. Support schemes pref.,2084,6.8527,2.5486,1,11
+Higher EE standards pref.,2084,6.4587,2.6833,1,11
+Stronger EE standards pref.,2084,6.3916,2.6530,1,11
