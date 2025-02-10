@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 import re
 from pathlib import Path
 import seaborn as sns
+import warnings
+
+# Suppress all warnings (including FutureWarnings)
+warnings.filterwarnings('ignore')
+
 
 def run_regression(df, output_path_main, output_path_annex, output_path_diag, labels):
     """
@@ -34,19 +39,19 @@ def run_regression(df, output_path_main, output_path_annex, output_path_diag, la
     formula = f"{y} ~ {' + '.join(x_vars)}"
 
     # Run logit model
-    logit_model = smf.logit(formula, weights=df['Weight'], data=df).fit(cov_type='HC0')
+    logit_model = smf.logit(formula, data=df).fit(cov_type='HC0', weights=df['Weight'])
     logit_mfx = logit_model.get_margeff(at='mean', method='dydx')
     logit_coef = logit_model.params
     logit_se = logit_model.bse
 
     # Run cloglog model
-    cloglog_model = smf.glm(formula, weights=df['Weight'], data=df, family=sm.families.Binomial(sm.families.links.cloglog())).fit(cov_type='HC0')
+    cloglog_model = smf.glm(formula, data=df, family=sm.families.Binomial(sm.families.links.cloglog())).fit(cov_type='HC0', weights=df['Weight'])
     cloglog_mfx = cloglog_model.get_margeff(at='mean', method='dydx')
     cloglog_coef = cloglog_model.params
     cloglog_se = cloglog_model.bse
 
     # Run poisson model
-    poisson_model = smf.poisson(formula, freq_weights=df['Weight'], data=df).fit(cov_type='HC0')
+    poisson_model = smf.poisson(formula, data=df).fit(cov_type='HC0', weights=df['Weight'])
     poisson_mfx = poisson_model.get_margeff(at='mean', method='dydx')
     poisson_coef = poisson_model.params
     poisson_se = poisson_model.bse
@@ -264,7 +269,7 @@ def run_regressions_high_low(
     # Run regressions for low-cost and high-cost models
     for model_name, formula in [("Low-cost", formula_low), ("High-cost", formula_high)]:
         for link_name, link in [("Cloglog", sm.families.links.CLogLog()), ("Logit", sm.families.links.logit())]:
-            model = smf.glm(formula, data=df, family=sm.families.Binomial(link)).fit()
+            model = smf.glm(formula, data=df, family=sm.families.Binomial(link)).fit(weights=df.Weight)
             mfx = model.get_margeff(at="mean", method="dydx")
             # Store results and diagnostics
             results_marginal[(model_name, link_name)] = mfx.summary_frame()
@@ -420,7 +425,7 @@ def run_multinomial_logit(
     formula = f"treatedmulti ~ {' + '.join(predictors)}"
 
     # Fit the multinomial logit model
-    mnl_model = smf.mnlogit(formula, data=df, weights=df.Weight).fit()
+    mnl_model = smf.mnlogit(formula, data=df).fit(weights=df.Weight)
 
     # Get the summary of coefficients for each category
     results_df = mnl_model.summary2().tables[1]

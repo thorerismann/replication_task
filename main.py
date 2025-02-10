@@ -54,6 +54,11 @@ def main():
     if not cpath.exists():
         basic_viz.corr_plot(df,cpath)
 
+    # make variance inflation factor data for comparison
+    vpath = Path.cwd() / 'outputs' / 'variance_inflation_factor.csv'
+    if not vpath.exists():
+        basic_viz.check_variance_inflation_factor(df,vpath)
+
     f1path = Path.cwd() / 'outputs' / 'figure_1.png'
 
     # make figure 1
@@ -124,4 +129,5 @@ def main():
 
 
     print('done')
+
 main()

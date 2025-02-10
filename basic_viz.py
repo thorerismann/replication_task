@@ -1,5 +1,9 @@
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+
 def generate_descriptive_stats(df, output_path):
     """
     Generate descriptive statistics, print them to the console, and save as a table image.
@@ -206,3 +210,39 @@ def corr_plot(df, outputpath):
 
     # save to .csv
     corr_matrix.reset_index().to_csv(outputpath.with_suffix('.csv'), index=False)
+
+
+def check_variance_inflation_factor(df, outputpath):
+    newdf = df.dropna(how='any')
+    x_vars = [
+        "AdoptionLikelihood_1", "AdoptionLikelihood_2", "AdoptionLikelihood_3",
+        "AdoptionLikelihood_4", "AdoptionLikelihood_5", "CircumstancesLikelihood_1",
+        "CircumstancesLikelihood_2", "CircumstancesLikelihood_3", "CircumstancesLikelihood_4",
+        "CircumstancesLikelihood_5", "awarenessum", "tenure", "whenbuilt2", "house_type2",
+        "squarefootage", "bedrooms", "hhsize", "income", "old75", "minor16", "address_change_time",
+        "EPCrating", "profile_GOR"
+    ]
+    new_df = newdf[x_vars].copy()
+    # Compute VIF for each predictor
+    vif_df = pd.DataFrame({
+        "Variable": new_df.columns,
+        "VIF": [variance_inflation_factor(new_df.values, i) for i in range(new_df.shape[1])]
+    })
+    vif_df.reset_index().to_csv(outputpath, index=False)
+
+    x_vars_small = ["awarenessum", "tenure", "whenbuilt2", "house_type2",
+        "squarefootage", "bedrooms", "hhsize", "income", "old75", "minor16", "address_change_time",
+        "EPCrating", "profile_GOR"
+    ]
+    small_df = new_df[x_vars_small].copy()
+    # Compute VIF for each predictor
+    vif_df_small = pd.DataFrame({
+        "Variable": small_df.columns,
+        "VIF": [variance_inflation_factor(small_df.values, i) for i in range(small_df.shape[1])]
+    })
+    newpath = outputpath.parent / 'small_vif.csv'
+    vif_df_small.reset_index().to_csv(newpath, index=False)
+
+
+    print(vif_df)  # Check for high values
+

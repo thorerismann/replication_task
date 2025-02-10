@@ -1,0 +1,9 @@
+name: erismann_rep
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - matplotlib
+  - pandas
+  - seaborn
+  - statsmodels
