@@ -1,14 +1,20 @@
+from collections import OrderedDict
+
+import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 import re
 from pathlib import Path
-import seaborn as sns
+import pylogit as pl
 import warnings
 
+from sklearn.linear_model import LogisticRegression, PoissonRegressor
+
+
 # Suppress all warnings (including FutureWarnings)
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
 
 
 def run_regression(df, output_path_main, output_path_annex, output_path_diag, labels):
@@ -39,25 +45,31 @@ def run_regression(df, output_path_main, output_path_annex, output_path_diag, la
     formula = f"{y} ~ {' + '.join(x_vars)}"
 
     # Run logit model
-    logit_model = smf.logit(formula, data=df).fit(cov_type='HC0', weights=df['Weight'])
+    logit_model = smf.glm(formula, data=df,
+                          family=sm.families.Binomial(),
+                          var_weights=df['Weight']).fit(cov_type='HC0')
     logit_mfx = logit_model.get_margeff(at='mean', method='dydx')
     logit_coef = logit_model.params
     logit_se = logit_model.bse
 
     # Run cloglog model
-    cloglog_model = smf.glm(formula, data=df, family=sm.families.Binomial(sm.families.links.cloglog())).fit(cov_type='HC0', weights=df['Weight'])
+    cloglog_model = smf.glm(formula, data=df, family=sm.families.Binomial(sm.families.links.cloglog()), var_weights=df['Weight']).fit(cov_type='HC0')
     cloglog_mfx = cloglog_model.get_margeff(at='mean', method='dydx')
     cloglog_coef = cloglog_model.params
     cloglog_se = cloglog_model.bse
 
     # Run poisson model
-    poisson_model = smf.poisson(formula, data=df).fit(cov_type='HC0', weights=df['Weight'])
+    poisson_model = smf.glm(formula, data=df,
+                            family=sm.families.Poisson(),
+                            var_weights=df['Weight']).fit(cov_type='HC0')
     poisson_mfx = poisson_model.get_margeff(at='mean', method='dydx')
     poisson_coef = poisson_model.params
     poisson_se = poisson_model.bse
 
-    # Calculate pseudo R² for cloglog manually
+    # Calculate pseudo R² manually since glm does not have mcfadden's pseudo rsquared build in.
     cloglog_pseudo_r2 = 1 - (cloglog_model.llf / cloglog_model.llnull)
+    logit_pseudo_r2 =  1 - (logit_model.llf / logit_model.llnull)
+
 
     # Extract variable names dynamically from one of the models
     var_names = logit_mfx.summary_frame().index.tolist()
@@ -103,7 +115,7 @@ def run_regression(df, output_path_main, output_path_annex, output_path_diag, la
     # Create the diagnostics DataFrame
     diagnostics = pd.DataFrame({
         "Statistic": ["N", "Pseudo R²", "AIC", "BIC"],
-        "Logit": [logit_model.nobs, logit_model.prsquared, logit_model.aic, logit_model.bic],
+        "Logit": [logit_model.nobs, 1 - (logit_model.llf / logit_model.llnull), logit_model.aic, logit_model.bic],
         "Cloglog": [cloglog_model.nobs, cloglog_pseudo_r2, cloglog_model.aic, cloglog_model.bic],
         "Poisson": [poisson_model.nobs, None, poisson_model.aic, poisson_model.bic]
     })
@@ -147,6 +159,158 @@ def run_regression(df, output_path_main, output_path_annex, output_path_diag, la
     print(f"Diagnostics saved to {output_path_diag}")
 
     return rdm
+
+
+def run_regression_pylogit(data, output_path_main, output_path_annex, output_path_diag, labels):
+    """
+    Run logit, cloglog, and poisson regressions with marginal effects, and create diagnostics using labels.
+
+    Parameters:
+    df (pd.DataFrame): The dataset with relevant variables.
+    output_path_main (str or Path): Path to save the main table (marginal effects).
+    output_path_annex (str or Path): Path to save the coefficients table.
+    output_path_diag (str or Path): Path to save the diagnostics table.
+    labels (dict): Dictionary mapping variable names to labels.
+
+    Returns:
+    pd.DataFrame: A summary table of marginal effects and diagnostics.
+    """
+    # Define the dependent variable and independent variables
+
+    # Run Cloglog Model using PyLogit
+    df = data.reset_index().copy()  # Create a proper index column
+    df = df.dropna(how='any')
+    print(f'there are {len(df)} observations')
+    df["obs_id"] = df.index  # Explicit observation ID
+    df["alt_id"] = 1  # Since this is binary logit, assign a single alternative ID
+
+    y = "treated"
+    x_vars = [
+        "AdoptionLikelihood_1", "AdoptionLikelihood_2", "AdoptionLikelihood_3",
+        "AdoptionLikelihood_4", "AdoptionLikelihood_5", "CircumstancesLikelihood_1",
+        "CircumstancesLikelihood_2", "CircumstancesLikelihood_3", "CircumstancesLikelihood_4",
+        "CircumstancesLikelihood_5", "awarenessum", "tenure", "whenbuilt2", "house_type2",
+        "squarefootage", "bedrooms", "hhsize", "income", "old75", "minor16", "address_change_time",
+        "EPCrating", "profile_GOR"
+    ]
+
+    specification = OrderedDict((var, "all_same") for var in x_vars)
+
+    # Run Logit Model using PyLogit
+    logit_model = pl.create_choice_model(
+        data=df,
+        alt_id_col='alt_id',
+        obs_id_col='obs_id',
+        choice_col=y,
+        specification=specification,
+        model_type="MNL"
+    )
+    init_vals = np.zeros(len(specification))
+    logit_model.fit_mle(init_vals, weights=df["Weight"])
+    logit_coef = logit_model.params
+    logit_se = logit_model.standard_errors
+
+    cloglog_model = pl.create_choice_model(
+        data=df,
+        alt_id_col='alt_id',
+        obs_id_col='obs_id',
+        choice_col=y,
+        specification=specification,
+        model_type="cloglog"
+    )
+    cloglog_model.fit_mle(init_vals, weights=df["Weight"])
+    cloglog_coef = cloglog_model.params
+    cloglog_se = cloglog_model.standard_errors
+
+    # Run Poisson Model using Statsmodels
+    formula = f"{y} ~ {' + '.join(x_vars)}"
+    poisson_model = smf.glm(formula, data=df, family=sm.families.Poisson(), var_weights=df['Weight']).fit(
+        cov_type='HC0')
+    poisson_coef = poisson_model.params
+    poisson_se = poisson_model.bse
+
+    # Create the coefficients results DataFrame
+    results_df_coeff = pd.DataFrame({
+        "Variable": logit_coef.index,
+        "Logit Coefficient": logit_coef,
+        "Logit SE": logit_se,
+        "Cloglog Coefficient": cloglog_coef,
+        "Cloglog SE": cloglog_se,
+        "Poisson Coefficient": poisson_coef,
+        "Poisson SE": poisson_se
+    })
+
+    results_df_coeff.reset_index().to_csv(output_path_main.with_suffix('.csv'), index=False)
+
+    # Create the diagnostics DataFrame
+    diagnostics = pd.DataFrame({
+        "Statistic": ["N", "AIC", "BIC"],
+        "Logit": [logit_model.log_likelihood, logit_model.aic, logit_model.bic],
+        "Cloglog": [cloglog_model.log_likelihood, cloglog_model.aic, cloglog_model.bic],
+        "Poisson": [poisson_model.nobs, poisson_model.aic, poisson_model.bic]
+    })
+
+    print(f"Table saved to {output_path_main}")
+    print(diagnostics)
+
+    return results_df_coeff
+
+
+def run_regression_scikit_learn(data, path_to_file):
+    df = data.dropna(how='any')
+    x_vars = [
+        "AdoptionLikelihood_1", "AdoptionLikelihood_2", "AdoptionLikelihood_3",
+        "AdoptionLikelihood_4", "AdoptionLikelihood_5", "CircumstancesLikelihood_1",
+        "CircumstancesLikelihood_2", "CircumstancesLikelihood_3", "CircumstancesLikelihood_4",
+        "CircumstancesLikelihood_5", "awarenessum", "tenure", "whenbuilt2", "house_type2",
+        "squarefootage", "bedrooms", "hhsize", "income", "old75", "minor16", "address_change_time",
+        "EPCrating", "profile_GOR"
+    ]
+
+    X = df[x_vars].copy()
+    y = df["treated"]
+
+    # Fit logit model with weights
+    logit_model = LogisticRegression(solver="lbfgs", max_iter=1000)
+    logit_model.fit(X, y, sample_weight=df["Weight"])
+
+    # Get coefficients and standard errors for Logit model
+    logit_coef = logit_model.coef_.flatten()
+    logit_intercept = logit_model.intercept_[0]
+    logit_predictions = logit_model.predict_proba(X)[:, 1]
+    logit_variance = np.diag(np.linalg.inv(np.dot(X.T, X)))
+    logit_se = np.sqrt(logit_variance)
+
+    # Fit Poisson model
+    poisson_model = PoissonRegressor(max_iter=1000)
+    poisson_model.fit(X, y, sample_weight=df["Weight"])
+
+    # Get coefficients and standard errors for Poisson model
+    poisson_coef = poisson_model.coef_.flatten()
+    poisson_intercept = poisson_model.intercept_
+    poisson_predictions = poisson_model.predict(X)
+    poisson_variance = np.diag(np.linalg.inv(np.dot(X.T, X)))
+    poisson_se = np.sqrt(poisson_variance)
+
+    coeff_df = pd.DataFrame({
+        "Variable": x_vars,
+        "Logit Coefficient": logit_coef,
+        "Logit SE": logit_se,
+        "Poisson Coefficient": poisson_coef,
+        "Poisson SE": poisson_se,
+    })
+
+    coeff_df['Lower CI Logit'] = coeff_df['Logit Coefficient'] - 1.96 * coeff_df['Logit SE']
+    coeff_df['Upper CI Logit'] = coeff_df['Logit Coefficient'] + 1.96 * coeff_df['Logit SE']
+    coeff_df['result logit'] = ((coeff_df['Lower CI Logit'] > 0) & (coeff_df['Upper CI Logit'] > 0)) | (
+            (coeff_df['Lower CI Logit'] < 0) & (coeff_df['Upper CI Logit'] < 0))
+    coeff_df.to_csv(path_to_file)
+
+    # Add intercepts separately
+
+
+    return coeff_df
+
 
 def plot_odds_ratios(results_df, output_path):
     """
@@ -269,7 +433,7 @@ def run_regressions_high_low(
     # Run regressions for low-cost and high-cost models
     for model_name, formula in [("Low-cost", formula_low), ("High-cost", formula_high)]:
         for link_name, link in [("Cloglog", sm.families.links.CLogLog()), ("Logit", sm.families.links.logit())]:
-            model = smf.glm(formula, data=df, family=sm.families.Binomial(link)).fit(weights=df.Weight)
+            model = smf.glm(formula, data=df, family=sm.families.Binomial(link), var_weights=df.Weight).fit()
             mfx = model.get_margeff(at="mean", method="dydx")
             # Store results and diagnostics
             results_marginal[(model_name, link_name)] = mfx.summary_frame()
@@ -425,7 +589,7 @@ def run_multinomial_logit(
     formula = f"treatedmulti ~ {' + '.join(predictors)}"
 
     # Fit the multinomial logit model
-    mnl_model = smf.mnlogit(formula, data=df).fit(weights=df.Weight)
+    mnl_model = smf.mnlogit(formula, data=df).fit()
 
     # Get the summary of coefficients for each category
     results_df = mnl_model.summary2().tables[1]

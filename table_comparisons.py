@@ -37,9 +37,10 @@ def make_table_1_comparison(new_table_1_path, old_table_1_path):
 
     remainder.to_csv(rpath)
 
-def make_table_3_comparisons(new_table_path, old_table_path):
+def make_table_3_comparisons(new_table_path, new_table_path_appendix, old_table_path):
     df_1 = pd.read_csv(old_table_path)
     df_2 = pd.read_csv(new_table_path)
+    df_3 = pd.read_csv(new_table_path_appendix)
     keep = ['Grants', 'Higher EE. standards', 'Info. Efficient use', 'Info. Support schemes',
             'Loans', 'Release admin. barriers', 'Stronger EE. standards', 'Tax credits', 'Tenure (Other)',
             'Tenure (Renter)','Utilities involvement', 'Info. potential savings']
@@ -54,11 +55,20 @@ def make_table_3_comparisons(new_table_path, old_table_path):
     df_2['Lower CI Logit'] = df_2['Logit Marginal Effect'] - 1.96 * df_2['Logit SE']
     df_2['Upper CI Logit'] = df_2['Logit Marginal Effect'] + 1.96 * df_2['Logit SE']
 
+    df_3['Lower CI Cloglog'] = df_3['Cloglog Coefficient'] - 1.96 * df_3['Cloglog SE']
+    df_3['Upper CI Cloglog'] = df_3['Cloglog Coefficient'] + 1.96 * df_3['Cloglog SE']
+    df_3['Lower CI Logit'] = df_3['Logit Coefficient'] - 1.96 * df_3['Logit SE']
+    df_3['Upper CI Logit'] = df_3['Logit Coefficient'] + 1.96 * df_3['Logit SE']
+
     df_1['result cloglog'] = ((df_1['Lower CI Cloglog'] > 0 ) & (df_1['Upper CI Cloglog'] > 0 )) | ((df_1['Lower CI Cloglog'] < 0 ) & (df_1['Upper CI Cloglog'] < 0 ))
     df_2['result cloglog'] = ((df_2['Lower CI Cloglog'] > 0) & (df_2['Upper CI Cloglog'] > 0)) | ((df_2['Lower CI Cloglog'] < 0) & (df_2['Upper CI Cloglog'] < 0))
     df_1['result logit'] = ((df_1['Lower CI Logit'] > 0 ) & (df_1['Upper CI Logit'] > 0 )) | ((df_1['Lower CI Logit'] < 0 ) & (df_1['Upper CI Logit'] < 0 ))
     df_2['result logit'] = ((df_2['Lower CI Logit'] > 0 ) & (df_2['Upper CI Logit'] > 0 )) | ((df_2['Lower CI Logit'] < 0 ) & (df_2['Upper CI Logit'] < 0 ))
+    df_3['result cloglog'] = ((df_3['Lower CI Cloglog'] > 0) & (df_3['Upper CI Cloglog'] > 0)) | ((df_3['Lower CI Cloglog'] < 0) & (df_3['Upper CI Cloglog'] < 0))
+    df_3['result logit'] = ((df_3['Lower CI Logit'] > 0 ) & (df_3['Upper CI Logit'] > 0 )) | ((df_3['Lower CI Logit'] < 0 ) & (df_3['Upper CI Logit'] < 0 ))
+
     df_1.to_csv(new_table_path.parent / 'table_3_sig.csv')
     df_2.to_csv(new_table_path.parent / 'table_3_sig_book.csv')
+    df_3.to_csv(new_table_path.parent / 'table_3a_sig.csv')
 
     print('made comparison table 1')

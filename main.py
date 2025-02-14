@@ -84,11 +84,19 @@ def main():
     t3apath = Path.cwd() / 'outputs' / 'table_3a.png'
     old_t3path = Path.cwd() / 'data' / 'table_3_data.csv'
 
+    t3apath_pylogit = Path.cwd() / 'outputs' / 'table_3a_pylogit.png'
+
+
     if not t3path.exists():
         rdf = results.run_regression(df, t3path, t3apath, t3path_diag, labels)
         results.plot_odds_ratios(rdf, f4path)
-        table_comparisons.make_table_3_comparisons(t3path.with_suffix('.csv'), old_t3path)
-
+        table_comparisons.make_table_3_comparisons(t3path.with_suffix('.csv'), t3apath.with_suffix('.csv'), old_t3path)
+    try:
+        results.run_regression_pylogit(df, t3path, t3apath_pylogit, t3path_diag, labels)
+    except Exception as e:
+        print('***** known error occured. Singular Matrix for pylogit *****')
+        print(e)
+    results.run_regression_scikit_learn(df, Path.cwd() / 'outputs' / 'sklearn_coeffs.csv')
     # make table 4 - main path, diagnostics path, table 4 appendix path, figure 5 path
     t4path = Path.cwd() / 'outputs' / 'table_4.csv'
     t4path_diag = Path.cwd() / 'outputs' / 'table_4_diag.csv'

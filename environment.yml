@@ -3,7 +3,10 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - python=3.9
   - matplotlib
   - pandas
   - seaborn
   - statsmodels
+  - pylogit
+  - scikit-learn
